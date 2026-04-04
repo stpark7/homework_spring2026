@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import tyro
@@ -20,7 +21,7 @@ from hw1_imitation.data import (
     load_pusht_zarr,
 )
 from hw1_imitation.model import build_policy, PolicyType
-from hw1_imitation.evaluation import Logger
+from hw1_imitation.evaluation import Logger, evaluate_policy
 
 LOGDIR_PREFIX = "exp"
 
@@ -31,7 +32,7 @@ class TrainConfig:
     data_dir: Path = Path("data")
 
     # The policy type -- either MSE or flow.
-    policy_type: PolicyType = "mse"
+    policy_type: PolicyType = "flow"
     # The number of denoising steps to use for the flow policy (has no effect for the MSE policy).
     flow_num_steps: int = 10
     # The action chunk size.
@@ -117,7 +118,7 @@ def run_training(config: TrainConfig) -> None:
         chunk_size=config.chunk_size,
         hidden_dims=config.hidden_dims,
     ).to(device)
-
+ 
     exp_name = f"seed_{config.seed}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     if config.exp_name is not None:
         exp_name += f"_{config.exp_name}"
@@ -128,6 +129,67 @@ def run_training(config: TrainConfig) -> None:
     logger = Logger(log_dir)
 
     ### TODO: PUT YOUR MAIN TRAINING LOOP HERE ###
+
+    # 1. Optimizer 정의
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    # 2. Training loop 작성
+    global_step = 0
+    for epoch in range(config.num_epochs):
+        for batch in loader:
+            state, action_chunk = batch
+            state = state.to(device)
+            action_chunk = action_chunk.to(device)
+
+            # a. compute_loss로 loss 계산
+            loss = model.compute_loss(state, action_chunk)
+            # b. Optimizer로 모델 업데이트
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # c. log_interval마다 loss 로깅
+            if global_step % config.log_interval == 0:
+                logger.log({"train/loss": loss.item()}, step=global_step)
+
+            # d. eval_interval마다 평가 및 영상 저장
+            if global_step % config.eval_interval == 0:
+                evaluate_policy(
+                    model=model,
+                    normalizer=normalizer,
+                    device=device,
+                    chunk_size=config.chunk_size,
+                    video_size=config.video_size,
+                    num_video_episodes=config.num_video_episodes,
+                    flow_num_steps=config.flow_num_steps,
+                    step=global_step,
+                    logger=logger,
+                )
+            global_step += 1
+    
+
+    # Training curves 플롯 생성
+    rows = logger.rows
+    train_steps = [r["step"] for r in rows if "train/loss" in r]
+    train_losses = [r["train/loss"] for r in rows if "train/loss" in r]
+    eval_steps = [r["step"] for r in rows if "eval/mean_reward" in r]
+    eval_rewards = [r["eval/mean_reward"] for r in rows if "eval/mean_reward" in r]
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+    axes[0].plot(train_steps, train_losses)
+    axes[0].set_xlabel("Training Steps")
+    axes[0].set_ylabel("Loss")
+    axes[0].set_title("Training Loss")
+
+    axes[1].plot(eval_steps, eval_rewards)
+    axes[1].set_xlabel("Training Steps")
+    axes[1].set_ylabel("Mean Reward")
+    axes[1].set_title("Evaluation Reward")
+
+    plt.tight_layout()
+    fig.savefig(log_dir / "training_curves.png", dpi=150)
+    plt.close(fig)
+    print(f"Training curves saved to {log_dir / 'training_curves.png'}")
 
     logger.dump_for_grading()
 
