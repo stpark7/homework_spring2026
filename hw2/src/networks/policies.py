@@ -98,6 +98,8 @@ class MLPPolicyPG(MLPPolicy):
         """Implements the policy gradient actor update."""
         obs = ptu.from_numpy(obs)
         actions = ptu.from_numpy(actions)
+        if self.discrete:
+            actions = actions.long()
         advantages = ptu.from_numpy(advantages)
 
         # TODO: compute the policy gradient actor loss

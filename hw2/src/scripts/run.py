@@ -59,7 +59,7 @@ def run_training_loop(logger, args):
 
     for itr in range(args.n_iter):
         print(f"\n********** Iteration {itr} ************")
-        # TODO: sample `args.batch_size` transitions using utils.sample_trajectories
+        # sample `args.batch_size` transitions using utils.sample_trajectories
         # make sure to use `max_ep_len`
         # trajs, envsteps_this_batch = None, None
         trajs, envsteps_this_batch = utils.sample_trajectories(
@@ -73,7 +73,7 @@ def run_training_loop(logger, args):
         # "trajectory별로 묶인 데이터"를 "key별로 묶인 데이터"로 전치(transpose) 하는 것
         trajs_dict = {k: [traj[k] for traj in trajs] for k in trajs[0]}
 
-        # TODO: train the agent using the sampled trajectories and the agent's update function
+        # train the agent using the sampled trajectories and the agent's update function
         train_info: dict = agent.update(
             trajs_dict["observation"],
             trajs_dict["action"],
