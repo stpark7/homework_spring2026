@@ -3,7 +3,7 @@ env_name: CartPole-v1
 exp_name: dqn
 hidden_size: 64
 num_layers: 2
-learning_rate: 0.0005
+learning_rate: 0.001
 total_steps: 100000
 discount: 0.99
 target_update_period: 1000

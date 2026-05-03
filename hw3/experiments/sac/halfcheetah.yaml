@@ -16,6 +16,6 @@ num_critic_updates: 1
 num_critic_networks: 1
 target_critic_backup_type: mean
 use_entropy_bonus: true
-temperature: 0.1
+temperature: 1.0
 backup_entropy: true
 use_tanh: true
